@@ -1,9 +1,15 @@
+import os
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
 
 from alembic import context
+
+from core.database import Base
+from pathlib import Path
+from dotenv import load_dotenv
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -18,7 +24,27 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = None
+
+#Define the path to the .env file(parent directory of FastAPI project)
+Base_Dir = Path(__file__).resolve().parent.parent #Move up one directory
+Env_Path = Base_Dir/".env"
+
+#Load environment variables from the .env file
+if Env_Path.exists():
+    load_dotenv(Env_Path)
+else:
+    print(f"Warning: .env file not found. Falling back to global environment")
+#Get the database URL from environment variables
+DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URL")
+config = context.config
+#Override sqlalchemy.url in alembic config with DATABASE_URL
+if DATABASE_URL:
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+else:
+    raise ValueError("DATABASE_URL is not set in the environment variables")
+
+from Books.models import *
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
