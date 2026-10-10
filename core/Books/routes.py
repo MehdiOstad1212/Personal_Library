@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from Books.models import BookModel
 from Books.schemas import *
 from sqlalchemy.orm import Session
@@ -9,9 +9,14 @@ from fastapi.responses import JSONResponse
 router = APIRouter(tags=["personal_library"])
 
 @router.get("/books", response_model=List[BookNameandAuthorResponseSchema])
-async def retrieve_the_whole_books(db: Session = Depends(get_db)):
+async def retrieve_the_whole_books(
+                    limit: int = Query(10, gt=0, le=50,
+                            description="Limit the number of books returned"),
+                        offset: int = Query(0, ge=0,
+                            description="Offset for pagination"),
+                        db: Session = Depends(get_db)):
     #only the name of the book and the author will be returned
-    result = db.query(BookModel.title_of_the_book, BookModel.author).all()
+    result = db.query(BookModel.title_of_the_book, BookModel.author).offset(offset).limit(limit).all()
     return result
 
 @router.get("/books/{book_id}", response_model=BookNameandAuthorResponseSchema)
@@ -23,9 +28,18 @@ async def retrieve_the_targeted_book(book_id: int = Path(..., gt = 0), db: Sessi
     return result
 
 @router.get("/personal_books", response_model=List[BookResponseSchema])
-async def retrieve_the_whole_personal_books(db: Session = Depends(get_db)):
-    result = db.query(BookModel).all()
-    return result
+async def retrieve_the_whole_personal_books(
+                        completed: bool = Query(None,
+                            description="Filter books by completion status"),
+                        limit: int = Query(10, gt=0, le=20,
+                            description="Limit the number of books returned"),
+                        offset: int = Query(0, ge=0,
+                            description="Offset for pagination"),
+                        db: Session = Depends(get_db)):
+    result = db.query(BookModel)
+    if completed is not None:
+        result = result.filter_by(is_completed = completed)
+    return result.offset(offset).limit(limit).all()
 
 @router.get("/personal_books/{book_id}", response_model=BookResponseSchema)
 async def retrieve_the_targeted_personal_books(book_id: int = Path(..., gt = 0), db: Session = Depends(get_db)):
