@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, Text, Boolean, func, Integer, DateTime
+from sqlalchemy import Column, String, Text, Boolean, func, Integer, DateTime, ForeignKey
 from core.database import Base
+from sqlalchemy.orm import relationship
 
 
 class BookModel(Base):
@@ -15,3 +16,6 @@ class BookModel(Base):
     updated_at = Column(DateTime(),
                         server_default=func.now(),
                         server_onupdate=func.now())
+
+    user = relationship("UserModel", back_populates="books", uselist = False)
+    user_id = Column(Integer, ForeignKey("users.id"))
