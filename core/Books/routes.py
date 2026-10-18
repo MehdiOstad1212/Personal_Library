@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from core.database import get_db
 from typing import List
 from fastapi.responses import JSONResponse
+from auth.jwt_auth import get_authenticated_user
+from users.models import UserModel
 
 router = APIRouter(tags=["personal_library"])
 
@@ -14,13 +16,16 @@ async def retrieve_the_whole_books(
                             description="Limit the number of books returned"),
                         offset: int = Query(0, ge=0,
                             description="Offset for pagination"),
-                        db: Session = Depends(get_db)):
+                        db: Session = Depends(get_db),
+                        user: UserModel = Depends(get_authenticated_user)):
     #only the name of the book and the author will be returned
     result = db.query(BookModel.title_of_the_book, BookModel.author).offset(offset).limit(limit).all()
     return result
 
 @router.get("/books/{book_id}", response_model=BookNameandAuthorResponseSchema)
-async def retrieve_the_targeted_book(book_id: int = Path(..., gt = 0), db: Session = Depends(get_db)):
+async def retrieve_the_targeted_book(book_id: int = Path(..., gt = 0),
+                                     db: Session = Depends(get_db),
+                                     user: UserModel = Depends(get_authenticated_user)):
     #only the name of the book and the author will be returned
     result = db.query(BookModel.title_of_the_book, BookModel.author).filter(BookModel.id == book_id).first()
     if not result:
@@ -35,30 +40,37 @@ async def retrieve_the_whole_personal_books(
                             description="Limit the number of books returned"),
                         offset: int = Query(0, ge=0,
                             description="Offset for pagination"),
-                        db: Session = Depends(get_db)):
-    result = db.query(BookModel)
+                        db: Session = Depends(get_db),
+                        user: UserModel = Depends(get_authenticated_user)):
+    result = db.query(BookModel).filter_by(user_id = user.id)
     if completed is not None:
         result = result.filter_by(is_completed = completed)
     return result.offset(offset).limit(limit).all()
 
 @router.get("/personal_books/{book_id}", response_model=BookResponseSchema)
-async def retrieve_the_targeted_personal_books(book_id: int = Path(..., gt = 0), db: Session = Depends(get_db)):
-    result = db.query(BookModel).filter(BookModel.id == book_id).first()
+async def retrieve_the_targeted_personal_books(book_id: int = Path(..., gt = 0), db: Session = Depends(get_db), user: UserModel = Depends(get_authenticated_user)):
+    result = db.query(BookModel).filter(BookModel.id == book_id, BookModel.user_id == user.id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Book not found")
     return result
 
 @router.post("/personal_books")
-async def create_a_new_book(book: BookCreateSchema, db: Session = Depends(get_db)):
-    new_book = BookModel(**book.model_dump())
+async def create_a_new_book(book: BookCreateSchema,
+                            db: Session = Depends(get_db),
+                            user: UserModel = Depends(get_authenticated_user)):
+    data = book.model_dump()
+    data.update({"user_id": user.id})
+    new_book = BookModel(**data)
     db.add(new_book)
     db.commit()
     db.refresh(new_book)
     return JSONResponse(status_code=201, content={"message": "Book created successfully", "book_id": new_book.id})
 
 @router.put("/personal_books/{book_id}", response_model=BookResponseSchema)
-async def update_a_book(book: BookUpdateSchema, book_id: int = Path(..., gt = 0), db: Session = Depends(get_db)):
-    result = db.query(BookModel).filter(BookModel.id == book_id).first()
+async def update_a_book(book: BookUpdateSchema, book_id: int = Path(..., gt = 0),
+                        db: Session = Depends(get_db),
+                        user: UserModel = Depends(get_authenticated_user)):
+    result = db.query(BookModel).filter(BookModel.id == book_id, BookModel.user_id == user.id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Book not found")
     for key, value in book.model_dump().items():
@@ -68,8 +80,10 @@ async def update_a_book(book: BookUpdateSchema, book_id: int = Path(..., gt = 0)
     return result
 
 @router.delete("/personal_books/{book_id}", status_code=204)
-async def delete_a_book(book_id: int = Path(..., gt = 0), db: Session = Depends(get_db)):
-    result = db.query(BookModel).filter(BookModel.id == book_id).first()
+async def delete_a_book(book_id: int = Path(..., gt = 0),
+                        db: Session = Depends(get_db),
+                        user: UserModel = Depends(get_authenticated_user)):
+    result = db.query(BookModel).filter(BookModel.id == book_id, BookModel.user_id == user.id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Book not found")
     db.delete(result)
