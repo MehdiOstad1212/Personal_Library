@@ -15,3 +15,6 @@ class UserRegisterSchema(BaseModel):
         if (password_confirm != validation.data.get("password")):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Passwords do not match")
         return password_confirm
+
+class UserRefreshSchema(BaseModel):
+    refresh_token: str = Field(..., description="The refresh token of the user")

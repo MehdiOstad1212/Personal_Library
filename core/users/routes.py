@@ -4,7 +4,7 @@ from core.database import get_db
 from users.models import UserModel
 from users.schemas import *
 from fastapi.responses import JSONResponse
-from auth.jwt_auth import generate_access_token, generate_refresh_token
+from auth.jwt_auth import generate_access_token, generate_refresh_token, decode_refresh_token
 
 router = APIRouter(tags=["users"], prefix="/users")
 
@@ -32,3 +32,10 @@ async def register_user(request: UserRegisterSchema, db: Session = Depends(get_d
     return JSONResponse(status_code=status.HTTP_201_CREATED,
                         content={"detail": "User registered successfully",
                                  "user_id": user_obj.id})
+
+@router.post("/refresh")
+async def refresh_token(request: UserRefreshSchema):
+    user_id = decode_refresh_token(request.refresh_token)
+    access_token = generate_access_token(user_id)
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "Access token refreshed successfully",
+                                                                 "access_token": access_token})
