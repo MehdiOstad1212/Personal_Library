@@ -18,19 +18,25 @@ async def retrieve_the_whole_books(
                             description="Offset for pagination"),
                         db: Session = Depends(get_db),
                         user: UserModel = Depends(get_authenticated_user)):
-    #only the name of the book and the author will be returned
-    result = db.query(BookModel.title_of_the_book, BookModel.author).offset(offset).limit(limit).all()
+    #only the name of the book and the author will be returned and sorted by the number_of_readers in descending order
+    result = db.query(BookModel.title_of_the_book, BookModel.author, BookModel.number_of_readers).order_by(BookModel.number_of_readers.desc()).offset(offset).limit(limit).all()
     return result
 
-@router.get("/books/{book_id}", response_model=BookNameandAuthorResponseSchema)
-async def retrieve_the_targeted_book(book_id: int = Path(..., gt = 0),
+@router.get("/books/{author}", response_model=List[AuthorFilteredResponseSchema])
+async def retrieve_the_targeted_book(author: str = Path(..., max_length=100, description="The author of the book"),
                                      db: Session = Depends(get_db),
                                      user: UserModel = Depends(get_authenticated_user)):
-    #only the name of the book and the author will be returned
-    result = db.query(BookModel.title_of_the_book, BookModel.author).filter(BookModel.id == book_id).first()
+    # only the name of the book and the author will be returned and the lowercase of the author will be used to filter the books and the result will be sorted by the number_of_readers in descending order
+    result = db.query(BookModel.title_of_the_book, BookModel.number_of_readers).filter(BookModel.author == author.lower()).all()
     if not result:
-        raise HTTPException(status_code=404, detail="Book not found")
-    return result
+        raise HTTPException(status_code=404, detail="details for this author not found")
+    # Deleting the repetitive books with the same title and author, only the last one will be returned with its number_of_readers
+    unique_books = {}
+    for book in result:
+        unique_books[book.title_of_the_book] = book
+    # Sorting the unique books by the number_of_readers in descending order
+    unique_books = dict(sorted(unique_books.items(), key=lambda item: item[1].number_of_readers, reverse=True))
+    return list(unique_books.values())
 
 @router.get("/personal_books", response_model=List[BookResponseSchema])
 async def retrieve_the_whole_personal_books(
@@ -59,7 +65,17 @@ async def create_a_new_book(book: BookCreateSchema,
                             db: Session = Depends(get_db),
                             user: UserModel = Depends(get_authenticated_user)):
     data = book.model_dump()
-    data.update({"user_id": user.id})
+    if db.query(BookModel).filter_by(title_of_the_book=data["title_of_the_book"].lower(), author=data["author"].lower(), user_id=user.id).first():
+        raise HTTPException(status_code=409, detail="Book with this title and author already exists in your personal library")
+    # the last book with the same title and author will be retrieved to update the number_of_readers
+    result = db.query(BookModel).filter_by(title_of_the_book=data["title_of_the_book"].lower(), author=data["author"].lower()).all()  # get the last book with the same title and author
+    if result:
+        new_result = result[-1].number_of_readers + 1
+    data.update({"user_id": user.id,
+                 "number_of_readers": new_result if result else 1,
+                 "title_of_the_book": data["title_of_the_book"].lower(),
+                 "author": data["author"].lower(),
+                 "is_completed": False if data["number_of_reads"] == 0 else True})
     new_book = BookModel(**data)
     db.add(new_book)
     db.commit()
@@ -73,7 +89,14 @@ async def update_a_book(book: BookUpdateSchema, book_id: int = Path(..., gt = 0)
     result = db.query(BookModel).filter(BookModel.id == book_id, BookModel.user_id == user.id).first()
     if not result:
         raise HTTPException(status_code=404, detail="Book not found")
-    for key, value in book.model_dump().items():
+    data = book.model_dump()
+    # If the number_of_reads is updated to 0, the book will be marked as not completed, otherwise it will be marked as completed
+    if book.number_of_reads == 0:
+        data.update({"is_completed": False})
+    # If the number_of_reads is updated to a value greater than 0, the book will be marked as completed
+    elif book.number_of_reads > 0:
+        data.update({"is_completed": True})
+    for key, value in data.items():
         setattr(result, key, value)
     db.commit()
     db.refresh(result)

@@ -12,6 +12,8 @@ class BookModel(Base):
     author = Column(String(100), nullable = False)
     description = Column(Text(500), nullable = True)
     is_completed = Column(Boolean, default=False)
+    number_of_reads = Column(Integer, nullable = False)
+    number_of_readers = Column(Integer, nullable = False)
     created_at = Column(DateTime(), server_default=func.now())
     updated_at = Column(DateTime(),
                         server_default=func.now(),
