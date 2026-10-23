@@ -23,7 +23,6 @@ class BookResponseSchema(BaseModel):
     description: Optional[str] = Field(None, max_length=500, description="A brief description of the book")
     is_completed: bool = Field("False", description="Indicates whether the book has been completed")
     number_of_reads: int = Field(..., description = "how many times have you read this particular book?")
-    number_of_readers: int = Field(..., description="The number of readers for the book")
     created_at: datetime = Field(..., description="The timestamp when the book was created")
     updated_at: datetime = Field(..., description="The timestamp when the book was last updated")
 

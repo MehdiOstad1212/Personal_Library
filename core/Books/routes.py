@@ -20,7 +20,12 @@ async def retrieve_the_whole_books(
                         user: UserModel = Depends(get_authenticated_user)):
     #only the name of the book and the author will be returned and sorted by the number_of_readers in descending order
     result = db.query(BookModel.title_of_the_book, BookModel.author, BookModel.number_of_readers).order_by(BookModel.number_of_readers.desc()).offset(offset).limit(limit).all()
-    return result
+    # Deleting the repetitive books with the same title and author, only the first one will be returned with its number_of_readers
+    unique_books = {}
+    for book in result:
+        if book.title_of_the_book not in unique_books:
+            unique_books[book.title_of_the_book] = book
+    return list(unique_books.values())
 
 @router.get("/books/{author}", response_model=List[AuthorFilteredResponseSchema])
 async def retrieve_the_targeted_book(author: str = Path(..., max_length=100, description="The author of the book"),
