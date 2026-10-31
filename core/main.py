@@ -1,4 +1,5 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, status
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from Books.routes import router as books_routes
 from users.routes import router as users_routes
@@ -39,3 +40,7 @@ app = FastAPI(
 
 app.include_router(books_routes, prefix = "/api/v1")
 app.include_router(users_routes, prefix = "/api/v1")
+
+@app.get('/')
+def root():
+    return JSONResponse(content = {'message': 'Hello World!'}, status_code = status.HTTP_202_ACCEPTED)
