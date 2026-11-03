@@ -6,6 +6,7 @@ import pytest
 from faker import Faker
 from users.models import UserModel
 from Books.models import BookModel
+from auth.jwt_auth import generate_access_token
 
 fake = Faker()
 
@@ -70,3 +71,17 @@ def generate_mock_data(db_session):
     db_session.add_all(book_list)
     db_session.commit()
     print(f'added 12 books for user with ID: {user.id}')
+
+@pytest.fixture(scope = 'function')
+def auth_client(db_session):
+    client = TestClient(app)
+    user = db_session.query(UserModel).filter_by(user_name = "usertest").one()
+    access_token = generate_access_token(user.id)
+    client.headers.update({"Authorization":f"Bearer {access_token}"})
+    yield client
+
+@pytest.fixture(scope = 'function')
+def random_book(db_session):
+    user = db_session.query(UserModel).filter_by(user_name = "usertest").one()
+    book = db_session.query(BookModel).filter_by(user_id = user.id).first()
+    return book
