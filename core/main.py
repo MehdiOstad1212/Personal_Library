@@ -1,8 +1,10 @@
-from fastapi import FastAPI, status
+from fastapi import FastAPI, status, HTTPException
 from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from Books.routes import router as books_routes
 from users.routes import router as users_routes
+from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.exceptions import RequestValidationError
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -40,6 +42,26 @@ app = FastAPI(
 
 app.include_router(books_routes, prefix = "/api/v1")
 app.include_router(users_routes, prefix = "/api/v1")
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request, exc):
+    error_response = {
+        "error": True,
+        "status_code": exc.status_code,
+        "detail": str(exc.detail)
+    }
+    return JSONResponse(status_code = exc.status_code, content = error_response)
+
+@app.exception_handler(RequestValidationError)
+async def http_validation_exception_handler(request, exc):
+    error_response = {
+        "error": True,
+        "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "detail": "there was a problem with your form request",
+        "content": exc.errors()
+    }
+    return JSONResponse(status_code = status.HTTP_422_UNPROCESSABLE_CONTENT, 
+                        content = error_response)
 
 @app.get('/')
 def root():
